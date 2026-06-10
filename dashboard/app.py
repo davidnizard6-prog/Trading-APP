@@ -70,11 +70,11 @@ def load_macro():
         return {}
 
 with st.spinner(f"Chargement de {ticker}…"):
-    try:
-        df_raw, df_sig, bt = load_main(ticker, period, ma_fast, ma_slow)
-    except Exception as e:
-        st.error(f"Impossible de charger {ticker} : {e}")
-        st.stop()
+    df_raw, df_sig, bt = load_main(ticker, period, ma_fast, ma_slow)
+
+if df_raw is None or df_sig is None:
+    st.error(f"⚠️ Impossible de charger les données pour **{ticker}**. Yahoo Finance limite les requêtes depuis Streamlit Cloud. Attendez 1-2 minutes et rafraîchissez la page.")
+    st.stop()
 
 latest_price = df_raw["close"].iloc[-1]
 latest_price_placeholder.metric("Dernier prix", f"${latest_price:,.2f}")
