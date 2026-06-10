@@ -1,0 +1,31 @@
+name: Alerte Matinale Trading
+
+on:
+  schedule:
+    # 7h30 heure de Paris (UTC+2 été = 05:30 UTC)
+    - cron: "30 5 * * 1-5"   # lundi → vendredi uniquement
+  workflow_dispatch:           # bouton manuel dans GitHub Actions
+
+jobs:
+  send-alert:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Installer les dépendances
+        run: pip install yfinance pandas numpy anthropic requests plotly
+
+      - name: Envoyer l'alerte matinale
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          PORTFOLIO_TICKERS: ${{ secrets.PORTFOLIO_TICKERS }}
+          CAPITAL: ${{ secrets.CAPITAL }}
+        run: python morning_alert.py
