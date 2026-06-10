@@ -90,15 +90,15 @@ def get_news(ticker: str, max_items: int = 8) -> list[dict]:
 
 
 def get_macro_indicators() -> dict:
+    from data.fetcher import _fetch_chart_api
     symbols = {"vix": "^VIX", "sp500": "^GSPC", "t10y": "^TNX", "dxy": "DX-Y.NYB"}
     result = {}
     for name, sym in symbols.items():
         try:
-            t = yf.Ticker(sym, session=_SESSION)
-            df = t.history(period="6mo", interval="1d", auto_adjust=True)
+            df = _fetch_chart_api(sym, "6mo")
             if df.empty:
                 continue
-            close = df["Close"].squeeze()
+            close = df["close"].squeeze()
             last = float(close.iloc[-1])
             prev = float(close.iloc[-2]) if len(close) >= 2 else last
             prev_month = float(close.iloc[-22]) if len(close) >= 22 else float(close.iloc[0])
