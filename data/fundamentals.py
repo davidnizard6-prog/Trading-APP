@@ -1,29 +1,34 @@
 import time
+import requests
 import yfinance as yf
 import pandas as pd
-from datetime import datetime
+
+_SESSION = requests.Session()
+_SESSION.headers.update({
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.5",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive",
+})
 
 
-def _safe_ticker_info(ticker: str, retries: int = 2) -> dict:
-    """Récupère le .info avec retry en cas de rate limit."""
+def _get_info(ticker: str, retries: int = 3) -> dict:
     for attempt in range(retries):
         try:
-            t = yf.Ticker(ticker)
+            t = yf.Ticker(ticker, session=_SESSION)
             info = t.info or {}
-            if info:
+            if info and len(info) > 3:
                 return info
         except Exception:
-            if attempt < retries - 1:
-                time.sleep(1)
+            pass
+        if attempt < retries - 1:
+            time.sleep(2 ** attempt)
     return {}
 
 
 def get_fundamentals(ticker: str) -> dict:
-    """Retourne les fondamentaux — dict vide si Yahoo bloque."""
-    try:
-        info = _safe_ticker_info(ticker)
-    except Exception:
-        info = {}
+    info = _get_info(ticker)
 
     def safe(key, default=None):
         v = info.get(key, default)
@@ -58,7 +63,7 @@ def get_fundamentals(ticker: str) -> dict:
 def get_news(ticker: str, max_items: int = 8) -> list[dict]:
     news = []
     try:
-        t = yf.Ticker(ticker)
+        t = yf.Ticker(ticker, session=_SESSION)
         raw = t.news or []
         for item in raw[:max_items]:
             content = item.get("content", {})
@@ -85,17 +90,15 @@ def get_news(ticker: str, max_items: int = 8) -> list[dict]:
 
 
 def get_macro_indicators() -> dict:
-    """Fetch key macro indicators: VIX, 10Y yield, DXY, S&P500."""
     symbols = {"vix": "^VIX", "sp500": "^GSPC", "t10y": "^TNX", "dxy": "DX-Y.NYB"}
     result = {}
     for name, sym in symbols.items():
         try:
-            df = yf.download(sym, period="6mo", interval="1d", auto_adjust=True, progress=False)
+            t = yf.Ticker(sym, session=_SESSION)
+            df = t.history(period="6mo", interval="1d", auto_adjust=True)
             if df.empty:
                 continue
-            close = df["Close"] if "Close" in df.columns else df.iloc[:, 0]
-            if hasattr(close, "squeeze"):
-                close = close.squeeze()
+            close = df["Close"].squeeze()
             last = float(close.iloc[-1])
             prev = float(close.iloc[-2]) if len(close) >= 2 else last
             prev_month = float(close.iloc[-22]) if len(close) >= 22 else float(close.iloc[0])
