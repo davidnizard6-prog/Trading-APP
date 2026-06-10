@@ -1,0 +1,5 @@
+paper_portfolio.json
+alerts_history.json
+__pycache__/
+*.pyc
+.env
