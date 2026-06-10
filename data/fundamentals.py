@@ -1,11 +1,27 @@
+import time
 import yfinance as yf
 import pandas as pd
 from datetime import datetime
 
 
+def _safe_ticker_info(ticker: str, retries: int = 3) -> dict:
+    """Récupère le .info avec retry en cas de rate limit."""
+    for attempt in range(retries):
+        try:
+            t = yf.Ticker(ticker)
+            info = t.info or {}
+            if info:
+                return info
+        except Exception as e:
+            if attempt < retries - 1:
+                time.sleep(2 ** attempt)
+            else:
+                return {}
+    return {}
+
+
 def get_fundamentals(ticker: str) -> dict:
-    t = yf.Ticker(ticker)
-    info = t.info or {}
+    info = _safe_ticker_info(ticker)
 
     def safe(key, default=None):
         v = info.get(key, default)
@@ -38,9 +54,9 @@ def get_fundamentals(ticker: str) -> dict:
 
 
 def get_news(ticker: str, max_items: int = 8) -> list[dict]:
-    t = yf.Ticker(ticker)
     news = []
     try:
+        t = yf.Ticker(ticker)
         raw = t.news or []
         for item in raw[:max_items]:
             content = item.get("content", {})
@@ -68,7 +84,7 @@ def get_news(ticker: str, max_items: int = 8) -> list[dict]:
 
 def get_macro_indicators() -> dict:
     """Fetch key macro indicators: VIX, 10Y yield, DXY, S&P500."""
-    symbols = {"VIX": "^VIX", "SP500": "^GSPC", "T10Y": "^TNX", "DXY": "DX-Y.NYB"}
+    symbols = {"vix": "^VIX", "sp500": "^GSPC", "t10y": "^TNX", "dxy": "DX-Y.NYB"}
     result = {}
     for name, sym in symbols.items():
         try:
@@ -76,13 +92,18 @@ def get_macro_indicators() -> dict:
             if df.empty:
                 continue
             close = df["Close"] if "Close" in df.columns else df.iloc[:, 0]
+            if hasattr(close, "squeeze"):
+                close = close.squeeze()
             last = float(close.iloc[-1])
+            prev = float(close.iloc[-2]) if len(close) >= 2 else last
             prev_month = float(close.iloc[-22]) if len(close) >= 22 else float(close.iloc[0])
             result[name] = {
-                "value": round(last, 2),
+                "current": round(last, 2),
+                "change_pct": round((last / prev - 1) * 100, 2),
                 "change_1m": round((last / prev_month - 1) * 100, 2),
                 "series": close,
             }
+            time.sleep(0.3)
         except Exception:
             pass
     return result
