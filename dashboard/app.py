@@ -45,7 +45,7 @@ def load_main(ticker, period, fast, slow):
         signals = compute_signals(df, fast, slow)
         result = run_backtest(signals, initial_capital=10_000)
         return df, signals, result
-    except Exception as e:
+    except Exception:
         return None, None, None
 
 @st.cache_data(ttl=3600)
@@ -69,12 +69,38 @@ def load_macro():
     except Exception:
         return {}
 
-with st.spinner(f"Chargement de {ticker}…"):
-    df_raw, df_sig, bt = load_main(ticker, period, ma_fast, ma_slow)
+# ── Bouton de chargement manuel ───────────────────────────────────────────────
+if "data_loaded" not in st.session_state:
+    st.session_state.data_loaded = False
+if "loaded_ticker" not in st.session_state:
+    st.session_state.loaded_ticker = ""
 
-if df_raw is None or df_sig is None:
-    st.error(f"⚠️ Impossible de charger les données pour **{ticker}**. Yahoo Finance limite les requêtes depuis Streamlit Cloud. Attendez 1-2 minutes et rafraîchissez la page.")
-    st.stop()
+# Reset si le ticker change
+if st.session_state.loaded_ticker != ticker:
+    st.session_state.data_loaded = False
+    st.session_state.loaded_ticker = ticker
+
+if not st.session_state.data_loaded:
+    st.markdown("## 📈 Trading App")
+    st.info(f"Ticker sélectionné : **{ticker}**  |  Période : **{period}**")
+    col_btn, _ = st.columns([1, 3])
+    if col_btn.button("🚀 Charger les données", type="primary", use_container_width=True):
+        with st.spinner(f"Chargement de {ticker}…"):
+            df_raw, df_sig, bt = load_main(ticker, period, ma_fast, ma_slow)
+        if df_raw is None:
+            st.error("⚠️ Yahoo Finance a bloqué la requête. Attendez 30 secondes et réessayez.")
+            st.stop()
+        st.session_state.df_raw = df_raw
+        st.session_state.df_sig = df_sig
+        st.session_state.bt = bt
+        st.session_state.data_loaded = True
+        st.rerun()
+    else:
+        st.stop()
+
+df_raw = st.session_state.df_raw
+df_sig = st.session_state.df_sig
+bt = st.session_state.bt
 
 latest_price = df_raw["close"].iloc[-1]
 latest_price_placeholder.metric("Dernier prix", f"${latest_price:,.2f}")
