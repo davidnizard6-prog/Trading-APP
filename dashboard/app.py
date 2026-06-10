@@ -38,22 +38,22 @@ if st.sidebar.button("🔄 Réinitialiser le portefeuille"):
     st.sidebar.success("Portefeuille réinitialisé")
 
 # ── Load main data ─────────────────────────────────────────────────────────────
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=1800)
 def load_main(ticker, period, fast, slow):
     df = fetch_ohlcv(ticker, period)
     signals = compute_signals(df, fast, slow)
     result = run_backtest(signals, initial_capital=10_000)
     return df, signals, result
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=3600)
 def load_fundamentals(ticker):
     return get_fundamentals(ticker)
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=3600)
 def load_news(ticker):
     return get_news(ticker)
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=3600)
 def load_macro():
     return get_macro_indicators()
 
