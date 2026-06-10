@@ -106,7 +106,7 @@ latest_price = df_raw["close"].iloc[-1]
 latest_price_placeholder.metric("Dernier prix", f"${latest_price:,.2f}")
 
 # ── Tabs ───────────────────────────────────────────────────────────────────────
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs([
     "📊 Graphique & Signaux",
     "🧪 Backtest",
     "🔍 Analyse Fondamentale",
@@ -116,6 +116,7 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
     "💡 Opportunités",
     "📸 Mon Portefeuille",
     "💼 Portefeuille Papier",
+    "🧠 Gestion de Portefeuille",
 ])
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1235,3 +1236,100 @@ with tab9:
         st.dataframe(hist_df.set_index("date"), use_container_width=True)
     else:
         st.info("Aucun ordre passé pour l'instant.")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 10 — Gestion de Portefeuille (synthèse intelligente)
+# ══════════════════════════════════════════════════════════════════════════════
+with tab10:
+    from strategies.portfolio_manager import analyze_portfolio
+
+    st.header("🧠 Gestion de Portefeuille")
+    st.markdown("Synthèse de **toutes les analyses** (Golden Cross, Kabbaj, Wyckoff, alertes, fondamentaux) "
+                "pour chaque position, avec un **plan de remaniement** concret.")
+
+    pm_source = st.radio(
+        "Source du portefeuille",
+        ["📦 Paper Trading (simulé)", "✏️ Saisir manuellement"],
+        horizontal=True, key="pm_source"
+    )
+
+    if pm_source == "📦 Paper Trading (simulé)":
+        pf_pm = get_portfolio()
+        pm_positions = {t: {"quantity": q, "avg_price": None}
+                        for t, q in pf_pm["positions"].items()}
+        if not pm_positions:
+            st.info("Portefeuille paper vide — saisissez vos positions manuellement.")
+    else:
+        pm_input = st.text_area(
+            "Vos positions (une par ligne : TICKER,quantité,prix_moyen)",
+            placeholder="AAPL,10,175.50\nMSFT,5,380.00\nNVDA,3,900.00",
+            height=120, key="pm_input"
+        )
+        pm_positions = {}
+        if pm_input.strip():
+            for line in pm_input.strip().split("\n"):
+                parts = [p.strip() for p in line.split(",")]
+                if parts[0]:
+                    t = parts[0].upper()
+                    qty = float(parts[1]) if len(parts) > 1 else 1
+                    avg = float(parts[2]) if len(parts) > 2 else None
+                    pm_positions[t] = {"quantity": qty, "avg_price": avg}
+
+    if pm_positions and st.button("🧠 Analyser et proposer un remaniement", type="primary", use_container_width=True):
+        with st.spinner(f"Analyse complète de {len(pm_positions)} positions (≈{len(pm_positions)*3}s)…"):
+            pm_result = analyze_portfolio(pm_positions, capital=initial_capital)
+
+        summary = pm_result["summary"]
+        if summary is None:
+            st.error("Aucune position n'a pu être analysée.")
+            for err in pm_result["errors"]:
+                st.error(f"{err['ticker']} : {err['error']}")
+        else:
+            # ── Vue d'ensemble ────────────────────────────────────────────────
+            health_color = "#26a69a" if summary["avg_health"] >= 60 else "#ffa726" if summary["avg_health"] >= 40 else "#ef5350"
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("💼 Valeur totale", f"${summary['total_value']:,.0f}")
+            m2.metric("🩺 Santé moyenne", f"{summary['avg_health']}/100")
+            m3.metric("📊 Positions", summary["n_positions"])
+            m4.metric("💰 Cash à libérer", f"${summary['freed_cash']:,.0f}")
+
+            # ── Avertissements ────────────────────────────────────────────────
+            for w in summary["warnings"]:
+                st.warning(w)
+
+            # ── Plan de remaniement ───────────────────────────────────────────
+            st.subheader("📋 Plan de remaniement proposé")
+            if summary["rebalance_plan"]:
+                for step in summary["rebalance_plan"]:
+                    st.markdown(f"- {step}")
+            else:
+                st.success("✅ Aucun remaniement nécessaire — toutes les positions sont saines. Conserver.")
+
+            # ── Allocation sectorielle ────────────────────────────────────────
+            st.subheader("🥧 Allocation par secteur")
+            sec_df = pd.DataFrame(list(summary["sectors"].items()), columns=["Secteur", "Poids (%)"])
+            fig_sec = go.Figure(go.Pie(labels=sec_df["Secteur"], values=sec_df["Poids (%)"], hole=0.45))
+            fig_sec.update_layout(template="plotly_dark", height=320, margin=dict(t=20, b=20))
+            st.plotly_chart(fig_sec, use_container_width=True)
+
+            # ── Détail par position ───────────────────────────────────────────
+            st.subheader("🔬 Détail par position (triées de la plus fragile à la plus saine)")
+            for a in pm_result["positions"]:
+                ac = a["action_color"]
+                pnl_str = f"{a['pnl_pct']:+.1f}%" if a["pnl_pct"] is not None else "N/A"
+                with st.expander(f"{a['action_emoji']} **{a['ticker']}** — {a['action']} · Santé {a['health']}/100 · {a['weight_pct']}% du portefeuille",
+                                 expanded=a["action"] in ("VENDRE", "RÉDUIRE")):
+                    d1, d2, d3, d4, d5 = st.columns(5)
+                    d1.metric("Prix", f"${a['price']:,.2f}")
+                    d2.metric("Valeur", f"${a['value']:,.0f}")
+                    d3.metric("P&L", pnl_str)
+                    d4.metric("Setup Kabbaj", f"{a['setup_score']}/100")
+                    d5.metric("Stop conseillé", f"${a['stop_loss']}" if a["stop_loss"] else "N/A")
+                    st.markdown(f"**Phase :** {a['phase']} · **Golden Cross :** {'✅ actif' if a['golden_cross'] else '❌ inactif'} · **Secteur :** {a['sector']}")
+                    st.markdown("**Pourquoi cette recommandation :**")
+                    for r in a["reasons"]:
+                        st.markdown(f"- {r}")
+
+            for err in pm_result["errors"]:
+                st.error(f"**{err['ticker']}** n'a pas pu être analysé : {err['error']}")
