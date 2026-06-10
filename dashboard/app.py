@@ -40,22 +40,34 @@ if st.sidebar.button("🔄 Réinitialiser le portefeuille"):
 # ── Load main data ─────────────────────────────────────────────────────────────
 @st.cache_data(ttl=1800)
 def load_main(ticker, period, fast, slow):
-    df = fetch_ohlcv(ticker, period)
-    signals = compute_signals(df, fast, slow)
-    result = run_backtest(signals, initial_capital=10_000)
-    return df, signals, result
+    try:
+        df = fetch_ohlcv(ticker, period)
+        signals = compute_signals(df, fast, slow)
+        result = run_backtest(signals, initial_capital=10_000)
+        return df, signals, result
+    except Exception as e:
+        return None, None, None
 
 @st.cache_data(ttl=3600)
 def load_fundamentals(ticker):
-    return get_fundamentals(ticker)
+    try:
+        return get_fundamentals(ticker)
+    except Exception:
+        return {}
 
 @st.cache_data(ttl=3600)
 def load_news(ticker):
-    return get_news(ticker)
+    try:
+        return get_news(ticker)
+    except Exception:
+        return []
 
 @st.cache_data(ttl=3600)
 def load_macro():
-    return get_macro_indicators()
+    try:
+        return get_macro_indicators()
+    except Exception:
+        return {}
 
 with st.spinner(f"Chargement de {ticker}…"):
     try:
