@@ -290,12 +290,18 @@ def scan_portfolio_alerts(positions: dict, period: str = "2y") -> dict:
     results = {}
     timestamp = datetime.now().isoformat()
 
+    from data.fundamentals import get_fundamentals
+
     for ticker in positions:
         try:
             df = fetch_ohlcv(ticker, period)
             lt_signals = check_long_term_signals(ticker, df)
             st_signals = check_short_term_signals(ticker, df)
             price = float(df["close"].iloc[-1])
+            try:
+                name = get_fundamentals(ticker).get("name") or ticker
+            except Exception:
+                name = ticker
 
             pos_data = positions[ticker]
             qty = pos_data if isinstance(pos_data, (int, float)) else pos_data.get("quantity", 0)
@@ -303,6 +309,7 @@ def scan_portfolio_alerts(positions: dict, period: str = "2y") -> dict:
             pnl_pct = round((price / avg - 1) * 100, 2) if avg else None
 
             results[ticker] = {
+                "name": name,
                 "price": price,
                 "quantity": qty,
                 "avg_price": avg,

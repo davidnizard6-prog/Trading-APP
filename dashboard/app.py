@@ -653,8 +653,8 @@ with tab4:
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
     <div>
       <span style="background:{tf_badge_color};color:#fff;font-size:0.7em;padding:2px 8px;border-radius:4px;font-weight:bold;">{timeframe_hint}</span>
-      <span style="font-size:1.4em;font-weight:bold;color:{rc};margin-left:8px;">{r["ticker"]}</span>
-      <span style="color:#888;margin-left:8px;">{r["name"]}</span>
+      <span style="font-size:1.4em;font-weight:bold;color:{rc};margin-left:8px;">{r["name"]}</span>
+      <span style="color:#888;margin-left:8px;">({r["ticker"]})</span>
       <span style="color:#555;font-size:0.8em;margin-left:8px;">{r["sector"]}</span><br/>
       <span style="color:{r["phase_color"]};font-size:0.9em;">{r["phase_emoji"]} {r["phase"]}</span>{pattern_html}
     </div>
@@ -770,7 +770,9 @@ with tab5:
                 has_exit = data.get("has_exit")
                 badge = "🟢 ENTRÉE DÉTECTÉE" if has_entry else "🔴 SORTIE DÉTECTÉE" if has_exit else "ℹ️ INFO"
 
-                with st.expander(f"**{ticker}** — {len(all_signals)} alerte(s) · {badge}", expanded=has_entry or has_exit):
+                name_disp = data.get("name") or ticker
+                title_disp = f"{name_disp} ({ticker})" if name_disp != ticker else ticker
+                with st.expander(f"**{title_disp}** — {len(all_signals)} alerte(s) · {badge}", expanded=has_entry or has_exit):
                     pc1, pc2, pc3, pc4 = st.columns(4)
                     pc1.metric("Prix actuel", f"${price:,.2f}")
                     pc2.metric("Quantité", f"{qty:.2f}")
@@ -869,8 +871,9 @@ with tab6:
             m = data["metrics"]
             f = data["fund"]
             pos = int(data["signals"]["position"].iloc[-1])
+            full_name = f.get("name") or t
             rows.append({
-                "Ticker": t,
+                "Ticker": f"{full_name} ({t})" if full_name != t else t,
                 "Signal": "🟢 Long" if pos == 1 else "🔴 Hors position",
                 "Rendement strat.": f"{m['total_return']}%",
                 "Buy & Hold": f"{m['buy_hold_return']}%",
@@ -967,8 +970,8 @@ with tab7:
 <div style="border-left: 4px solid {color}; padding: 10px 14px; margin-bottom: 8px; background: #0d1117; border-radius: 0 8px 8px 0;">
   <div style="display:flex; justify-content:space-between; align-items:center;">
     <div>
-      <b style="color:{color}; font-size:1.1em;">{row['ticker']}</b>
-      <span style="color:#888; font-size:0.85em; margin-left:8px;">{row.get('name','')[:35]}</span>
+      <b style="color:{color}; font-size:1.1em;">{row.get('name', row['ticker'])[:35]}</b>
+      <span style="color:#888; font-size:0.85em; margin-left:8px;">({row['ticker']})</span>
       <span style="color:#555; font-size:0.8em; margin-left:8px;">{row.get('sector','')}</span>
     </div>
     <div style="text-align:right;">
@@ -1012,8 +1015,8 @@ with tab7:
 <div style="border-left: 4px solid #ffa726; padding: 10px 14px; margin-bottom: 8px; background: #0d1117; border-radius: 0 8px 8px 0;">
   <div style="display:flex; justify-content:space-between; align-items:center;">
     <div>
-      <b style="color:#ffa726; font-size:1.1em;">{row['ticker']}</b>
-      <span style="color:#888; font-size:0.85em; margin-left:8px;">{row.get('name','')[:35]}</span>
+      <b style="color:#ffa726; font-size:1.1em;">{row.get('name', row['ticker'])[:35]}</b>
+      <span style="color:#888; font-size:0.85em; margin-left:8px;">({row['ticker']})</span>
     </div>
     <div style="text-align:right;">
       <b style="color:#ef5350;">-{drop}% depuis haut 52s</b>
@@ -1318,7 +1321,8 @@ with tab10:
             for a in pm_result["positions"]:
                 ac = a["action_color"]
                 pnl_str = f"{a['pnl_pct']:+.1f}%" if a["pnl_pct"] is not None else "N/A"
-                with st.expander(f"{a['action_emoji']} **{a['ticker']}** — {a['action']} · Santé {a['health']}/100 · {a['weight_pct']}% du portefeuille",
+                display_name = a["name"] if a.get("name") and a["name"] != a["ticker"] else a["ticker"]
+                with st.expander(f"{a['action_emoji']} **{display_name}** ({a['ticker']}) — {a['action']} · Santé {a['health']}/100 · {a['weight_pct']}% du portefeuille",
                                  expanded=a["action"] in ("VENDRE", "RÉDUIRE")):
                     d1, d2, d3, d4, d5 = st.columns(5)
                     d1.metric("Prix", f"${a['price']:,.2f}")
