@@ -608,7 +608,15 @@ def full_kabbaj_analysis(df: pd.DataFrame, capital: float = 10_000, risk_pct: fl
     market_phase = detect_market_phase(df)
     sr_levels = find_support_resistance(df)
     candlesticks = detect_candlestick_patterns(df, lookback=10)
-    stop_loss = sr_levels["nearest_support"] or round(price * 0.95, 2)
+    # Stop : sous le support le plus proche, mais jamais à plus de 2×ATR
+    # du prix (un stop trop large détruit le ratio risque/gain)
+    support_stop = sr_levels["nearest_support"]
+    atr_stop = round(price - 2 * atr_val, 2)
+    if support_stop and support_stop >= atr_stop:
+        stop_loss = support_stop
+    else:
+        stop_loss = atr_stop
+    stop_loss = min(stop_loss, round(price * 0.995, 2))  # toujours sous le prix
     mm = compute_money_management(price, capital, stop_loss, risk_pct, atr_val)
     setup_score = compute_setup_score(df, market_phase, sr_levels, candlesticks, macd_df, bb_df, stoch_df)
 
@@ -655,6 +663,16 @@ def scan_entry_signals(tickers: list[str], period: str = "2y", capital: float = 
             recent_patterns = [p for p in patterns if p["candle_idx"] >= len(df) - 4]
             last_pattern = recent_patterns[-1]["pattern"] if recent_patterns else None
 
+            # Stop/objectif cohérents : risque réel = prix - stop,
+            # objectif = max(résistance, 2× le risque), R/R recalculé dessus
+            price_k = kab["price"]
+            stop_k = mm.get("stop_loss") or round(price_k * 0.95, 2)
+            risk_k = max(price_k - stop_k, 0.01)
+            resistance_k = sr["nearest_resistance"] or 0
+            take_profit = round(max(resistance_k, price_k + 2 * risk_k), 2)
+            rr_clean = round((take_profit - price_k) / risk_k, 2)
+            target_pct = round((take_profit / price_k - 1) * 100, 1)
+
             # Only collect meaningful results
             results.append({
                 "ticker": ticker,
@@ -673,7 +691,9 @@ def scan_entry_signals(tickers: list[str], period: str = "2y", capital: float = 
                 "ret_3m": phase["ret_3m"],
                 "nearest_support": sr["nearest_support"],
                 "nearest_resistance": sr["nearest_resistance"],
-                "risk_reward": sr["risk_reward_ratio"],
+                "risk_reward": rr_clean,
+                "take_profit": take_profit,
+                "target_pct": target_pct,
                 "stop_loss": mm.get("stop_loss"),
                 "position_shares": mm.get("position_size_shares"),
                 "position_value": mm.get("position_value"),

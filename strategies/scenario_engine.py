@@ -198,7 +198,10 @@ def compute_scenarios(df_signals: pd.DataFrame, fundamentals: dict, macro: dict)
     vol = _historical_volatility(close)
     target = fundamentals.get("analyst_target")
     upside_analyst = ((target / price_now - 1) * 100) if target and price_now else None
-    div_yield = (fundamentals.get("dividend_yield") or 0) * 100
+    # Yahoo renvoie le dividende déjà en % (ex: 0.98 = 0,98%). Si la valeur
+    # est < 0.25 on suppose l'ancien format décimal et on convertit.
+    raw_div = fundamentals.get("dividend_yield") or 0
+    div_yield = raw_div * 100 if raw_div < 0.25 else raw_div
 
     bull_return = _estimate_return("bull", probs, upside_analyst, vol, div_yield, scores)
     base_return = _estimate_return("base", probs, upside_analyst, vol, div_yield, scores)

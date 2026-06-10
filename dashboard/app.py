@@ -635,7 +635,9 @@ with tab4:
                 score = r["setup_score"]
                 rc = r["rating_color"]
                 stars = "⭐" * (5 if score >= 70 else 4 if score >= 55 else 3)
-                upside_str = f"+{r['upside']}%" if r.get("upside") else "N/A"
+                upside_str = (f"${r['take_profit']} (+{r['target_pct']}%)"
+                              if r.get("take_profit") else
+                              (f"+{r['upside']}%" if r.get("upside") else "N/A"))
                 rr_str = f"{r['risk_reward']}:1" if r.get("risk_reward") else "N/A"
                 rr_color = "#26a69a" if (r.get("risk_reward") or 0) >= 2 else "#ffa726"
                 pattern_str = f"🕯️ {r['last_pattern']}" if r.get("last_pattern") else ""
