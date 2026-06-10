@@ -4,7 +4,7 @@ import pandas as pd
 from datetime import datetime
 
 
-def _safe_ticker_info(ticker: str, retries: int = 3) -> dict:
+def _safe_ticker_info(ticker: str, retries: int = 2) -> dict:
     """Récupère le .info avec retry en cas de rate limit."""
     for attempt in range(retries):
         try:
@@ -12,16 +12,18 @@ def _safe_ticker_info(ticker: str, retries: int = 3) -> dict:
             info = t.info or {}
             if info:
                 return info
-        except Exception as e:
+        except Exception:
             if attempt < retries - 1:
-                time.sleep(2 ** attempt)
-            else:
-                return {}
+                time.sleep(1)
     return {}
 
 
 def get_fundamentals(ticker: str) -> dict:
-    info = _safe_ticker_info(ticker)
+    """Retourne les fondamentaux — dict vide si Yahoo bloque."""
+    try:
+        info = _safe_ticker_info(ticker)
+    except Exception:
+        info = {}
 
     def safe(key, default=None):
         v = info.get(key, default)

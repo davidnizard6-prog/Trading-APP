@@ -161,9 +161,22 @@ with tab3:
     st.header(f"Analyse Fondamentale & Scénarios — {ticker}")
 
     with st.spinner("Chargement des données fondamentales…"):
-        fund = load_fundamentals(ticker)
-        news = load_news(ticker)
-        macro = load_macro()
+        try:
+            fund = load_fundamentals(ticker)
+        except Exception:
+            fund = {}
+        try:
+            news = load_news(ticker)
+        except Exception:
+            news = []
+        try:
+            macro = load_macro()
+        except Exception:
+            macro = {}
+
+    if not fund:
+        st.warning("⚠️ Yahoo Finance limite les requêtes depuis Streamlit Cloud. Les données fondamentales sont temporairement indisponibles. Réessayez dans quelques minutes ou lancez l'application en local.")
+        st.stop()
 
     with st.spinner("Calcul des scénarios…"):
         scenario_result = compute_scenarios(df_sig, fund, macro)
